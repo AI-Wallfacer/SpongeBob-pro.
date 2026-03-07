@@ -8,7 +8,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1+-ee4c2c.svg)](https://pytorch.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-*Tokenizer → Pretrain → SFT → GRPO 全链路实现*
+*Pretrain → SFT → GRPO 全链路实现*
 
 </div>
 
@@ -86,8 +86,9 @@ SpongeBob-Pro/
 > 在大规模中文语料上进行无监督的语言建模训练，让模型学习基础的语言知识和语法结构。
 
 <div align="center">
-
 ![Pretrain Training Process](assets/pretrain.png)
+
+![Pretrain Results](assets/pretrain_result.png)
 
 *训练过程中 loss 稳定下降，表明模型正在有效学习语言模式*
 
@@ -117,26 +118,6 @@ python dataset/preprocess_data.py \
 > 💡 这会生成 `pretrain_512.bin` 和 `pretrain_512.meta` 两个文件
 
 ### 🚀 训练配置
-
-<details>
-<summary><b>单卡训练</b></summary>
-
-```bash
-python train/pretrain.py \
-  --data_path /path/to/pretrain_data/pretrain_512 \
-  --save_dir ./out_pretrain/exp_1 \
-  --hidden_size 768 \
-  --num_hidden_layers 12 \
-  --max_seq_len 512 \
-  --batch_size 128 \
-  --learning_rate 1e-3 \
-  --epochs 2 \
-  --dtype bfloat16
-```
-
-</details>
-
-**多卡训练（推荐）**
 
 ```bash
 torchrun --nproc_per_node=2 train/pretrain.py \
@@ -185,10 +166,6 @@ out_pretrain/exp_1/h768_l12_bs128_lr0.001/
     └── ...
 ```
 
-<div align="center">
-
-![Pretrain Results](assets/pretrain_result.png)
-
 </div>
 
 ---
@@ -197,26 +174,25 @@ out_pretrain/exp_1/h768_l12_bs128_lr0.001/
 
 > 使用对话数据对预训练模型进行微调，使其能够理解和遵循用户指令。
 
+#### 1.先学习对话范式
+
 <div align="center">
 
 ![SFT Training Process](assets/sft.png)
 
+![SFT Results](assets/sft_result.png)
+
 *基于 Pretrain 权重进行监督微调，使用更小的学习率（2e-5）进行精细调整*
+
+#### 2.进一步思维链蒸馏
+
+![SFT Thinking](assets/sft_thinking.png)
+
+![SFT Thinking Results](assets/sft_thinking_result.png)
 
 </div>
 
 ### 📝 数据格式
-
-**单轮对话**
-
-```json
-{
-  "conversations": [
-    {"role": "user", "content": "介绍一下你自己"},
-    {"role": "assistant", "content": "我是张小凡，一个AI助手..."}
-  ]
-}
-```
 
 **多轮对话**
 
@@ -250,21 +226,6 @@ torchrun --nproc_per_node=2 train/train_sft.py \
   --dtype bfloat16
 ```
 
-<details>
-<summary><b>从头训练（不推荐）</b></summary>
-
-```bash
-torchrun --nproc_per_node=2 train/train_sft.py \
-  --data_path /path/to/sft_data.jsonl \
-  --tokenizer_path ./tokenizer_15k \
-  --save_dir ./out_sft/exp_1 \
-  --hidden_size 768 \
-  --num_hidden_layers 12 \
-  --batch_size 128 \
-  --learning_rate 2e-5 \
-  --epochs 3
-```
-
 </details>
 
 ### ⚙️ 关键参数说明
@@ -295,9 +256,6 @@ out_sft/exp_1/h768_l12_bs128_lr2e-05/
 ```
 
 <div align="center">
-
-![SFT Results](assets/sft_result.png)
-
 </div>
 
 ---
@@ -306,9 +264,36 @@ out_sft/exp_1/h768_l12_bs128_lr2e-05/
 
 > 使用强化学习方法，基于 DeepSeek Judge 的奖励信号进一步优化模型输出质量。
 
-> ⚠️ **实验状态**: 仅在 Claude 交互下跑完了 400+ step，中途 DeepSeek API 还欠费了 😅
+<div align="center">
 
-### 🚀 快速开始
+![GRPO Training Process](assets/grpo1.png)
+
+*GRPO 通过多次采样和奖励信号优化模型输出，提升生成质量*
+
+</div>
+
+### 🎯 核心机制
+
+GRPO 采用 **Group Relative Policy Optimization** 算法，结合格式检查和 Judge 评分：
+
+| 步骤 | 说明 |
+|------|------|
+| 1️⃣ **多次采样** | 对每个 prompt 生成 N 个回复（默认 4 个） |
+| 2️⃣ **格式检查** | 验证 `<think>\n...\n</think>\n...` 格式 |
+| 3️⃣ **Judge 评分** | DeepSeek Judge 从流畅度、准确性、指令遵循三维度打分 |
+| 4️⃣ **奖励计算** | 格式错误 → reward=0；格式正确 → reward=三指标均值 |
+| 5️⃣ **策略优化** | 使用组内相对优势函数更新策略模型 |
+
+### 📝 数据格式
+
+**Prompt 数据（JSONL）**
+
+```json
+{"prompt": "介绍一下你自己"}
+{"prompt": "什么是机器学习？"}
+```
+
+### 🚀 训练配置
 
 ```bash
 torchrun --nproc_per_node=2 train/train_grpo.py \
@@ -319,10 +304,45 @@ torchrun --nproc_per_node=2 train/train_grpo.py \
   --save_dir ./out_grpo/exp_1 \
   --batch_size 16 \
   --num_generations 4 \
-  --learning_rate 5e-7
+  --learning_rate 5e-7 \
+  --beta 0.05
+```
+
+### ⚙️ 关键参数说明
+
+| 参数 | 说明 | 推荐值 |
+|------|------|:------:|
+| `--learning_rate` | 学习率（比 SFT 更小） | `5e-7` |
+| `--num_generations` | 每个 prompt 生成数量 | `4` |
+| `--beta` | KL 散度惩罚系数 | `0.05` |
+| `--max_gen_len` | 最大生成长度 | `512` |
+| `--grad_clip` | 梯度裁剪阈值 | `0.2` |
+| `--judge_api_key` | DeepSeek API Key | 必填 |
+
+### 🎯 GRPO 特性
+
+- 🎲 **多样性采样**: 每个 prompt 生成多个候选回复
+- 📊 **三维评分**: 流畅度 + 准确性 + 指令遵循
+- 🔄 **相对优势**: 组内归一化，避免奖励偏差
+- 🛡️ **KL 惩罚**: 防止模型偏离 SFT 基线过远
+- 📈 **实时监控**: solve_all / solve_none 率追踪
+
+### 📦 输出文件
+
+```
+out_grpo/exp_1/h768_l12_bs16_lr5e-07/
+├── global_step_20/
+│   ├── grpo_768.pth          # GRPO 模型权重
+│   └── resume.pth             # 断点文件
+├── data_log/                  # Rollout 数据
+│   ├── global_step_1.jsonl    # 每步的生成样本和奖励
+│   └── ...
+└── ...
 ```
 
 > 💡 GRPO 是可选阶段，适合在 SFT 效果满意后进一步优化
+>
+> ⚠️ **实验状态**: 在 Claude 交互下跑完了 400+ step，中途 DeepSeek API 欠费了 😅
 
 ---
 
@@ -330,13 +350,17 @@ torchrun --nproc_per_node=2 train/train_grpo.py \
 
 <div align="center">
 
-### GRPO 阶段成果
+### 训练过程监控
 
-![GRPO Results 1](assets/grpo1.png)
+![GRPO Training Metrics](assets/grpo2.png)
 
-![GRPO Results 2](assets/grpo2.png)
+*Loss 下降、Reward 上升、格式通过率提升，模型逐步学会生成高质量回复*
 
-*经过完整的训练流程后，模型能够进行流畅的中文对话，理解用户意图并给出合理的回复*
+### 生成效果对比
+
+![GRPO Thinking Results](assets/grpo-thinking-result.png)
+
+*经过 GRPO 训练后，模型能够生成结构化的思维链并给出准确回复*
 
 </div>
 

@@ -291,3 +291,4 @@ if __name__ == "__main__":
 
     # ========== 10. 清理 ==========
     if dist.is_initialized(): dist.destroy_process_group()
+    
