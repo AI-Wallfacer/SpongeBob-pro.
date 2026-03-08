@@ -94,8 +94,6 @@ SpongeBob-Pro/
 
 *训练过程中 loss 稳定下降，表明模型正在有效学习语言模式*
 
-</div>
-
 ### 📝 数据准备
 
 **原始数据格式（JSONL）**
@@ -168,8 +166,6 @@ out_pretrain/exp_1/h768_l12_bs128_lr0.001/
     └── ...
 ```
 
-</div>
-
 ---
 
 ## 🎯 阶段二：SFT（监督微调）
@@ -228,8 +224,6 @@ torchrun --nproc_per_node=2 train/train_sft.py \
   --dtype bfloat16
 ```
 
-</details>
-
 ### ⚙️ 关键参数说明
 
 | 参数 | 说明 | 推荐值 |
@@ -257,16 +251,12 @@ out_sft/exp_1/h768_l12_bs128_lr2e-05/
 └── ...
 ```
 
-<div align="center">
-</div>
-
 ---
 
 ## 🏆 阶段三：GRPO（强化学习优化）
 
 > 使用强化学习方法，基于 DeepSeek Judge 的奖励信号进一步优化模型输出质量。
 
-<div align="center">
 ### 🎯 核心机制
 
 GRPO 采用 **Group Relative Policy Optimization** 算法，结合格式检查和 Judge 评分：
@@ -343,8 +333,9 @@ out_grpo/exp_1/h768_l12_bs16_lr5e-07/
 
 ## 📊 实验结果展示
 
-<div align="center">
 ### 训练过程监控
+
+<div align="center">
 
 ![GRPO Training Process](assets/grpo1.png)
 
@@ -354,7 +345,11 @@ out_grpo/exp_1/h768_l12_bs16_lr5e-07/
 
 *Loss 下降、Reward 上升、格式通过率提升，模型逐步学会生成高质量回复*
 
+</div>
+
 ### 生成效果对比
+
+<div align="center">
 
 ![GRPO Thinking Results](assets/grpo-thinking-result.png)
 
