@@ -85,8 +85,10 @@ SpongeBob-Pro/
 
 > 在大规模中文语料上进行无监督的语言建模训练，让模型学习基础的语言知识和语法结构。
 
-<div align="center">
-![Pretrain Training Process](assets/pretrain.png)
+![image-20260308083754935](C:\Users\86183\AppData\Roaming\Typora\typora-user-images\image-20260308083754935.png)
+
+中途5090的卡存储满了😂删掉部分早期数据后曲线未在
+
 
 ![Pretrain Results](assets/pretrain_result.png)
 
